@@ -1,5 +1,7 @@
 # 本地视频人脸打码工具
 
+当前版本：`v0.2.0-alpha`
+
 一个面向 Windows 的本地视频人脸打码工具，基于 Python `deface` 实现人脸检测与匿名化处理，并提供中文 PowerShell GUI 界面。适合批量处理视频、保留原音频、生成抽帧复查报告，帮助快速检查是否存在漏打码画面。
 
 ## 功能特点
@@ -37,29 +39,35 @@
 
 ## 快速开始
 
-1. 把视频放入：
+1. 首次使用请先安装基础环境。可以双击打开 GUI 后点击“安装基础环境”，也可以在 PowerShell 中运行：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
+```
+
+2. 把视频放入：
 
 ```text
 input_videos
 ```
 
-2. 双击启动：
+3. 双击启动：
 
 ```text
 启动人脸打码工具.bat
 ```
 
-3. 在 GUI 中选择处理模式、打码预设和输出策略。
+4. 在 GUI 中选择处理模式、打码预设和输出策略。
 
-4. 点击“开始处理”。
+5. 点击“开始处理”。
 
-5. 处理完成后，结果会输出到：
+6. 处理完成后，结果会输出到：
 
 ```text
 output_videos
 ```
 
-6. 如果启用了抽帧复查，复查图片和 HTML 报告会生成在：
+7. 如果启用了抽帧复查，复查图片和 HTML 报告会生成在：
 
 ```text
 review_frames

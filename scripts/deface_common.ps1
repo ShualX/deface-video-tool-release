@@ -1,4 +1,4 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 
 function Get-DefaceProjectRoot {
     param(
@@ -52,6 +52,35 @@ function ConvertTo-DefaceBool {
     }
 }
 
+function Test-DefaceBaseEnvironment {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectRoot
+    )
+
+    $PythonExe = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
+    $DefaceExe = Join-Path $ProjectRoot ".venv\Scripts\deface.exe"
+    $PythonReady = Test-Path -LiteralPath $PythonExe
+    $DefaceReady = Test-Path -LiteralPath $DefaceExe
+    $Ready = $PythonReady -and $DefaceReady
+    $Message = "基础环境已安装。"
+
+    if (-not $PythonReady) {
+        $Message = "未找到 .venv 中的 Python。请先运行 setup.ps1，或在 GUI 中点击'安装基础环境'。"
+    } elseif (-not $DefaceReady) {
+        $Message = "未找到 deface.exe。请重新运行 setup.ps1 完成基础安装。"
+    }
+
+    return [pscustomobject]@{
+        Ready = $Ready
+        PythonExe = $PythonExe
+        DefaceExe = $DefaceExe
+        PythonReady = $PythonReady
+        DefaceReady = $DefaceReady
+        Message = $Message
+    }
+}
+
 function Get-DefaceFfmpegExe {
     param(
         [Parameter(Mandatory = $true)]
@@ -65,12 +94,12 @@ function Get-DefaceFfmpegExe {
 
     $PythonExe = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
     if (-not (Test-Path -LiteralPath $PythonExe)) {
-        throw "ffmpeg was not found in PATH, and .venv Python was not found."
+        throw "未找到 ffmpeg，也未找到 .venv 中的 Python。请先运行 setup.ps1，或在 GUI 中点击'安装基础环境'。"
     }
 
     $FfmpegExe = & $PythonExe -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
     if ($LASTEXITCODE -ne 0 -or -not $FfmpegExe -or -not (Test-Path -LiteralPath $FfmpegExe)) {
-        throw "ffmpeg was not found in PATH, and bundled imageio-ffmpeg could not be located."
+        throw "未找到 ffmpeg，并且无法从 imageio-ffmpeg 获取内置 ffmpeg。请重新运行 setup.ps1。"
     }
 
     return $FfmpegExe

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true, Position = 0)]
     [string]$InputPath,
 
@@ -51,8 +51,9 @@ $CommonScript = Join-Path $ScriptDir "deface_common.ps1"
 $DefaceExe = Join-Path $ProjectRoot ".venv\Scripts\deface.exe"
 $OutputDir = Join-Path $ProjectRoot "output_videos"
 
-if (-not (Test-Path -LiteralPath $DefaceExe)) {
-    throw "deface.exe not found: $DefaceExe. Please install deface in .venv first."
+$BaseEnv = Test-DefaceBaseEnvironment -ProjectRoot $ProjectRoot
+if (-not $BaseEnv.Ready) {
+    throw $BaseEnv.Message
 }
 
 $ResolvedInput = (Resolve-Path -LiteralPath $InputPath).ProviderPath

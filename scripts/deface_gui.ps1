@@ -19,6 +19,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 . (Join-Path $ScriptDir "deface_common.ps1")
 
+$AppVersion = "v0.2.0-alpha"
 $OneScript = Join-Path $ScriptDir "deface_one.ps1"
 $BatchScript = Join-Path $ScriptDir "deface_batch.ps1"
 $ReviewScript = Join-Path $ScriptDir "review_frames.ps1"
@@ -615,14 +616,106 @@ function Update-GpuStatus {
     }
 }
 
+function Update-BaseEnvironmentStatus {
+    $script:BaseEnvStatus = Test-DefaceBaseEnvironment -ProjectRoot $ProjectRoot
+
+    if ($script:BaseEnvStatus.Ready) {
+        $script:EnvStatusLabel.Text = "基础环境已安装"
+        $script:EnvStatusLabel.ForeColor = [System.Drawing.Color]::DarkGreen
+        $script:InstallBaseButton.Enabled = $false
+    } else {
+        $script:EnvStatusLabel.Text = "基础环境未安装，请点击安装"
+        $script:EnvStatusLabel.ForeColor = [System.Drawing.Color]::Firebrick
+        $script:InstallBaseButton.Enabled = $true
+        Write-Log $script:BaseEnvStatus.Message
+    }
+}
+
+function Install-BaseEnvironment {
+    $SetupScript = Join-Path $ProjectRoot "setup.ps1"
+    if (-not (Test-Path -LiteralPath $SetupScript)) {
+        Show-Error "没有找到 setup.ps1，无法自动安装基础环境。"
+        return $false
+    }
+
+    $script:InstallBaseButton.Enabled = $false
+    $script:InstallGpuButton.Enabled = $false
+    $StartButton.Enabled = $false
+    $ReviewOnlyButton.Enabled = $false
+    try {
+        Write-Log "开始安装基础环境：Python 虚拟环境、deface、onnx、imageio-ffmpeg。"
+        Set-Progress 0 1 "正在安装基础环境"
+        $ExitCode = Invoke-GuiCommand "powershell.exe" @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", $SetupScript
+        )
+        if ($ExitCode -ne 0) {
+            Write-Log "基础环境安装失败，退出码：$ExitCode"
+            Show-Error "基础环境安装失败，请查看运行日志。"
+            return $false
+        }
+
+        Write-Log "基础环境安装完成，正在重新检测。"
+        Update-BaseEnvironmentStatus
+        Update-GpuStatus
+        Update-EncoderStatus
+        Set-Progress 1 1 "基础环境已安装"
+        return [bool]$script:BaseEnvStatus.Ready
+    } catch {
+        Write-Log ("基础环境安装失败：" + $_.Exception.Message)
+        Show-Error $_.Exception.Message
+        return $false
+    } finally {
+        $StartButton.Enabled = $true
+        $ReviewOnlyButton.Enabled = $true
+        if (-not $script:BaseEnvStatus -or -not $script:BaseEnvStatus.Ready) {
+            $script:InstallBaseButton.Enabled = $true
+        }
+        if (-not $script:GpuStatus -or -not $script:GpuStatus.CudaAvailable) {
+            $script:InstallGpuButton.Enabled = $true
+        }
+    }
+}
+
+function Ensure-BaseEnvironmentReady {
+    Update-BaseEnvironmentStatus
+    if ($script:BaseEnvStatus.Ready) {
+        return $true
+    }
+
+    $Choice = [System.Windows.Forms.MessageBox]::Show(
+        "当前目录还没有安装基础环境，无法处理视频。`r`n`r`n是否现在自动安装 deface 和 ffmpeg 依赖？",
+        "需要安装基础环境",
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Question
+    )
+
+    if ($Choice -ne [System.Windows.Forms.DialogResult]::Yes) {
+        return $false
+    }
+
+    return (Install-BaseEnvironment)
+}
+
 function Update-EncoderStatus {
+    if (-not $script:BaseEnvStatus) {
+        $script:BaseEnvStatus = Test-DefaceBaseEnvironment -ProjectRoot $ProjectRoot
+    }
+
     $script:EncoderStatus = Get-DefaceEncoderStatus -ProjectRoot $ProjectRoot
     if ($script:EncoderStatus.H264Nvenc -or $script:EncoderStatus.HevcNvenc) {
         $script:EncoderStatusLabel.Text = "NVENC 可用"
         $script:EncoderStatusLabel.ForeColor = [System.Drawing.Color]::DarkGreen
     } elseif ($script:EncoderStatus.Error) {
-        $script:EncoderStatusLabel.Text = "编码检测失败"
-        $script:EncoderStatusLabel.ForeColor = [System.Drawing.Color]::Firebrick
+        if (-not $script:BaseEnvStatus.Ready) {
+            $script:EncoderStatusLabel.Text = "需安装基础环境"
+            $script:EncoderStatusLabel.ForeColor = [System.Drawing.Color]::Firebrick
+        } else {
+            $script:EncoderStatusLabel.Text = "编码检测失败"
+            $script:EncoderStatusLabel.ForeColor = [System.Drawing.Color]::Firebrick
+            Write-Log ("编码检测失败：" + $script:EncoderStatus.Error)
+        }
     } else {
         $script:EncoderStatusLabel.Text = "NVENC 不可用"
         $script:EncoderStatusLabel.ForeColor = [System.Drawing.Color]::DarkOrange
@@ -690,6 +783,11 @@ function Set-RunUiState {
     $StartButton.Enabled = -not $Running
     $ReviewOnlyButton.Enabled = -not $Running
     $StopButton.Enabled = $Running
+    $BaseReady = $false
+    if ($script:BaseEnvStatus) {
+        $BaseReady = [bool]$script:BaseEnvStatus.Ready
+    }
+    $script:InstallBaseButton.Enabled = (-not $Running) -and (-not $BaseReady)
     $script:CancelRequested = $false
 }
 
@@ -850,14 +948,14 @@ function Load-GuiSettings {
 }
 
 $Form = New-Object System.Windows.Forms.Form
-$Form.Text = "本地视频人脸打码工具"
+$Form.Text = "本地视频人脸打码工具 $AppVersion"
 $Form.StartPosition = "CenterScreen"
 $Form.Size = New-Object System.Drawing.Size(1000, 920)
 $Form.MinimumSize = New-Object System.Drawing.Size(1000, 920)
 $Form.Font = New-UiFont 9
 
 $Title = New-Object System.Windows.Forms.Label
-$Title.Text = "本地视频人脸打码工具"
+$Title.Text = "本地视频人脸打码工具 $AppVersion"
 $Title.Font = New-UiFont 15 ([System.Drawing.FontStyle]::Bold)
 $Title.Location = New-Object System.Drawing.Point(16, 12)
 $Title.Size = New-Object System.Drawing.Size(420, 34)
@@ -871,7 +969,7 @@ $Tip.ForeColor = [System.Drawing.Color]::DimGray
 $Form.Controls.Add($Tip)
 
 $GpuGroup = New-Object System.Windows.Forms.GroupBox
-$GpuGroup.Text = "GPU 加速"
+$GpuGroup.Text = "基础环境与 GPU 加速"
 $GpuGroup.Location = New-Object System.Drawing.Point(16, 54)
 $GpuGroup.Size = New-Object System.Drawing.Size(950, 88)
 $Form.Controls.Add($GpuGroup)
@@ -880,8 +978,10 @@ Add-Label $GpuGroup "GPU 状态：" 16 24 82 24 | Out-Null
 $script:GpuStatusLabel = Add-Label $GpuGroup "正在检测..." 98 24 610 24
 $script:UseGpuCheck = Add-CheckBox $GpuGroup "使用 GPU 加速" 18 54 150 $false
 $script:UseGpuCheck.Enabled = $false
+$script:EnvStatusLabel = Add-Label $GpuGroup "正在检测基础环境..." 178 54 520 24
 $RefreshGpuButton = Add-Button $GpuGroup "重新检测" 720 22 92 28
 $script:InstallGpuButton = Add-Button $GpuGroup "安装 GPU 组件" 822 22 120 28
+$script:InstallBaseButton = Add-Button $GpuGroup "安装基础环境" 720 54 120 28
 
 $PathGroup = New-Object System.Windows.Forms.GroupBox
 $PathGroup.Text = "处理任务"
@@ -1079,6 +1179,10 @@ $RefreshGpuButton.Add_Click({
     }
 })
 
+$script:InstallBaseButton.Add_Click({
+    Install-BaseEnvironment | Out-Null
+})
+
 $StopButton.Add_Click({
     $script:CancelRequested = $true
     Write-Log "正在请求停止..."
@@ -1089,8 +1193,9 @@ $StopButton.Add_Click({
 
 $script:InstallGpuButton.Add_Click({
     if (-not (Test-Path -LiteralPath $PythonExe)) {
-        Show-Error "没有找到 .venv 中的 Python。"
-        return
+        if (-not (Ensure-BaseEnvironmentReady)) {
+            return
+        }
     }
     $script:InstallGpuButton.Enabled = $false
     $StartButton.Enabled = $false
@@ -1129,6 +1234,9 @@ $script:InstallGpuButton.Add_Click({
 $StartButton.Add_Click({
     try {
         if (-not (Validate-Inputs)) {
+            return
+        }
+        if (-not (Ensure-BaseEnvironmentReady)) {
             return
         }
         if (-not (Confirm-ThinMosaicRisk)) {
@@ -1228,7 +1336,7 @@ $StartButton.Add_Click({
                     "-EverySeconds", ([string][int]$script:ReviewSecondsBox.Value),
                     "-GenerateHtml", "True"
                 )
-                Invoke-GuiCommand "powershell.exe" $ReviewArgs | Out-Null
+                $ReviewExitCode = Invoke-GuiCommand "powershell.exe" $ReviewArgs
             } else {
                 $ReviewArgs = @(
                     "-NoProfile",
@@ -1239,7 +1347,10 @@ $StartButton.Add_Click({
                     "-EverySeconds", ([string][int]$script:ReviewSecondsBox.Value),
                     "-GenerateHtml", "True"
                 )
-                Invoke-GuiCommand "powershell.exe" $ReviewArgs | Out-Null
+                $ReviewExitCode = Invoke-GuiCommand "powershell.exe" $ReviewArgs
+            }
+            if ($ReviewExitCode -ne 0 -and -not $script:CancelRequested) {
+                throw "抽帧复查失败，退出码：$ReviewExitCode"
             }
         }
 
@@ -1262,6 +1373,9 @@ $StartButton.Add_Click({
 
 $ReviewOnlyButton.Add_Click({
     New-Item -ItemType Directory -Force -Path $script:ReviewDirBox.Text | Out-Null
+    if (-not (Ensure-BaseEnvironmentReady)) {
+        return
+    }
     Set-RunUiState $true
     try {
         if ($script:SingleRadio.Checked -and (Test-Path -LiteralPath $script:InputFileBox.Text)) {
@@ -1291,7 +1405,10 @@ $ReviewOnlyButton.Add_Click({
             )
         }
         Set-Progress 0 1 "抽帧复查中"
-        Invoke-GuiCommand "powershell.exe" $Args | Out-Null
+        $ReviewExitCode = Invoke-GuiCommand "powershell.exe" $Args
+        if ($ReviewExitCode -ne 0 -and -not $script:CancelRequested) {
+            throw "抽帧复查失败，退出码：$ReviewExitCode"
+        }
         if ($script:CancelRequested) {
             Set-Progress 0 1 "已停止"
             Write-Log "抽帧复查已停止。"
@@ -1330,9 +1447,12 @@ $Form.Add_FormClosing({
 $script:CancelRequested = $false
 $script:CurrentProcess = $null
 $script:GpuWasTouched = $false
+$script:BaseEnvStatus = $null
+$script:GpuStatus = $null
 Load-GuiSettings
 Update-ModeControls
 Update-ReplaceControls
+Update-BaseEnvironmentStatus
 try {
     Update-GpuStatus
 } catch {
