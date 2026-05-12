@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$VideoPath,
     [string]$VideoDir,
     [string]$ReviewDir,
