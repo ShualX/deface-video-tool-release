@@ -171,3 +171,8 @@ review_frames/review.html
 ## 致谢
 
 核心人脸匿名化能力基于开源项目 `deface`。本项目主要提供 Windows 本地化脚本、中文 GUI、批量处理、GPU/NVENC 检测、复查报告和易用工作流封装。
+
+苏格拉底曾经问过我，如果Codex是你强大的秘诀，那没了Codex你还剩下什么？
+我：你等下我问下GPT
+
+power by Codex
