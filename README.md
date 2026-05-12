@@ -19,31 +19,13 @@
 - 支持停止当前处理任务。
 - 自动保存上次使用的 GUI 参数。
 
-## 目录结构
-
-```text
-.
-├─ input_videos/          # 放入待处理视频
-├─ output_videos/         # 输出打码后的视频
-├─ review_frames/         # 抽帧复查图片和 review.html
-├─ scripts/
-│  ├─ deface_gui.ps1      # 中文 GUI 主程序
-│  ├─ deface_one.ps1      # 处理单个视频
-│  ├─ deface_batch.ps1    # 批量处理视频
-│  ├─ review_frames.ps1   # 抽帧复查
-│  └─ deface_common.ps1   # 公共函数
-├─ .venv/                 # Python 虚拟环境
-├─ 启动人脸打码工具.bat
-└─ 启动人脸打码工具.ps1
-```
-
 ## 快速开始
 
-1. 首次使用请先安装基础环境。可以双击打开 GUI 后点击“安装基础环境”，也可以在 PowerShell 中运行：
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
+1. 前往release下载最新版本压缩包，将压缩包解压后，双击启动
+ ```text
+启动人脸打码工具.bat
 ```
+首次使用请先安装基础环境。可以双击打开 GUI 后点击“安装基础环境”，GPU组件可装可不装，实测对处理速度影响不大。
 
 2. 把视频放入：
 
@@ -51,23 +33,19 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
 input_videos
 ```
 
-3. 双击启动：
 
-```text
-启动人脸打码工具.bat
-```
 
-4. 在 GUI 中选择处理模式、打码预设和输出策略。
+3. 在 GUI 中选择处理模式、打码预设和输出策略。
 
-5. 点击“开始处理”。
+4. 点击“开始处理”。
 
-6. 处理完成后，结果会输出到：
+5. 处理完成后，结果会输出到：
 
 ```text
 output_videos
 ```
 
-7. 如果启用了抽帧复查，复查图片和 HTML 报告会生成在：
+6. 如果启用了抽帧复查，复查图片和 HTML 报告会生成在：
 
 ```text
 review_frames
@@ -155,6 +133,24 @@ review_frames/review.html
 ```
 
 打开该 HTML 文件即可快速检查打码效果，确认是否存在漏打码画面。
+
+## 目录结构
+
+```text
+.
+├─ input_videos/          # 放入待处理视频
+├─ output_videos/         # 输出打码后的视频
+├─ review_frames/         # 抽帧复查图片和 review.html
+├─ scripts/
+│  ├─ deface_gui.ps1      # 中文 GUI 主程序
+│  ├─ deface_one.ps1      # 处理单个视频
+│  ├─ deface_batch.ps1    # 批量处理视频
+│  ├─ review_frames.ps1   # 抽帧复查
+│  └─ deface_common.ps1   # 公共函数
+├─ .venv/                 # Python 虚拟环境
+├─ 启动人脸打码工具.bat
+└─ 启动人脸打码工具.ps1
+```
 
 ## 注意事项
 
