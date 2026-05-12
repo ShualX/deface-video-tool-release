@@ -1,0 +1,33 @@
+.venv/
+input_videos/*
+output_videos/*
+review_frames/*
+!input_videos/.gitkeep
+!output_videos/.gitkeep
+!review_frames/.gitkeep
+*.log
+.deface_gui_settings.json
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-wheel-metadata/
+dist/
+build/
+*.egg-info/
+
+# Large or private media files
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.wmv
+*.m4v
+*.webm
+
+# Local/editor files
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
