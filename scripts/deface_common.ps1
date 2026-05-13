@@ -105,6 +105,44 @@ function Get-DefaceFfmpegExe {
     return $FfmpegExe
 }
 
+function Test-DefaceFfmpegEncoder {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FfmpegExe,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Encoder
+    )
+
+    $TempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("deface_encoder_test_{0}" -f ([guid]::NewGuid().ToString("N")))
+    $OutputPath = Join-Path $TempDir "test.mp4"
+    $ErrorMessage = ""
+    $Available = $false
+
+    try {
+        New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
+        $Output = & $FfmpegExe -hide_banner -loglevel error `
+            -f lavfi -i "color=c=black:s=320x240:r=1:d=1" `
+            -an -frames:v 1 -pix_fmt yuv420p -c:v $Encoder -y $OutputPath 2>&1
+        $Available = ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $OutputPath))
+        if (-not $Available) {
+            $ErrorMessage = ($Output | Out-String).Trim()
+            if (-not $ErrorMessage) {
+                $ErrorMessage = "ffmpeg exited with code $LASTEXITCODE."
+            }
+        }
+    } catch {
+        $ErrorMessage = $_.Exception.Message
+    } finally {
+        Remove-Item -LiteralPath $TempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    return [pscustomobject]@{
+        Available = $Available
+        Error = $ErrorMessage
+    }
+}
+
 function Get-DefaceEncoderStatus {
     param(
         [Parameter(Mandatory = $true)]
@@ -114,9 +152,21 @@ function Get-DefaceEncoderStatus {
     $FfmpegExe = ""
     $Encoders = ""
     $ErrorMessage = ""
+    $H264NvencListed = $false
+    $HevcNvencListed = $false
+    $H264NvencStatus = [pscustomobject]@{ Available = $false; Error = "" }
+    $HevcNvencStatus = [pscustomobject]@{ Available = $false; Error = "" }
     try {
         $FfmpegExe = Get-DefaceFfmpegExe -ProjectRoot $ProjectRoot
         $Encoders = (& $FfmpegExe -hide_banner -encoders 2>&1 | Out-String)
+        $H264NvencListed = ($Encoders -match "\bh264_nvenc\b")
+        $HevcNvencListed = ($Encoders -match "\bhevc_nvenc\b")
+        if ($H264NvencListed) {
+            $H264NvencStatus = Test-DefaceFfmpegEncoder -FfmpegExe $FfmpegExe -Encoder "h264_nvenc"
+        }
+        if ($HevcNvencListed) {
+            $HevcNvencStatus = Test-DefaceFfmpegEncoder -FfmpegExe $FfmpegExe -Encoder "hevc_nvenc"
+        }
     } catch {
         $ErrorMessage = $_.Exception.Message
     }
@@ -124,9 +174,13 @@ function Get-DefaceEncoderStatus {
     return [pscustomobject]@{
         FfmpegExe = $FfmpegExe
         Libx264 = ($Encoders -match "\blibx264\b")
-        H264Nvenc = ($Encoders -match "\bh264_nvenc\b")
-        HevcNvenc = ($Encoders -match "\bhevc_nvenc\b")
+        H264NvencListed = $H264NvencListed
+        HevcNvencListed = $HevcNvencListed
+        H264Nvenc = [bool]$H264NvencStatus.Available
+        HevcNvenc = [bool]$HevcNvencStatus.Available
         Av1Nvenc = ($Encoders -match "\bav1_nvenc\b")
+        H264NvencError = [string]$H264NvencStatus.Error
+        HevcNvencError = [string]$HevcNvencStatus.Error
         Error = $ErrorMessage
     }
 }
@@ -314,7 +368,10 @@ with open(sys.argv[1], 'w', encoding='utf-8') as f:
         $ErrorMessage = "Python executable not found in .venv."
     }
 
-    $CudaAvailable = $NvidiaAvailable -and $OrtInstalled -and ($Providers -contains "CUDAExecutionProvider") -and $CudaTest
+    $CudaAvailable = $OrtInstalled -and ($Providers -contains "CUDAExecutionProvider") -and $CudaTest
+    if ($CudaAvailable -and -not $NvidiaName) {
+        $NvidiaName = "CUDA GPU"
+    }
 
     return [pscustomobject]@{
         NvidiaAvailable = $NvidiaAvailable

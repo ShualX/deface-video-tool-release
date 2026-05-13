@@ -2,6 +2,7 @@
     [string]$VideoPath,
     [string]$VideoDir,
     [string]$ReviewDir,
+    [ValidateRange(1, 3600)]
     [int]$EverySeconds = 5,
     [object]$GenerateHtml = $true
 )
@@ -42,6 +43,8 @@ if (-not $Videos) {
 foreach ($Video in $Videos) {
     $VideoReviewDir = Join-Path $ReviewDir $Video.BaseName
     New-Item -ItemType Directory -Force -Path $VideoReviewDir | Out-Null
+    Get-ChildItem -LiteralPath $VideoReviewDir -File -Filter "frame_*.jpg" -ErrorAction SilentlyContinue |
+        Remove-Item -Force
     $FramePattern = Join-Path $VideoReviewDir "frame_%06d.jpg"
 
     Write-Host "Extracting one frame every $EverySeconds seconds from $($Video.Name)"

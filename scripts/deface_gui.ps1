@@ -19,7 +19,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 . (Join-Path $ScriptDir "deface_common.ps1")
 
-$AppVersion = "v0.2.0-alpha"
+$AppVersion = "v0.3.0-alpha"
 $OneScript = Join-Path $ScriptDir "deface_one.ps1"
 $BatchScript = Join-Path $ScriptDir "deface_batch.ps1"
 $ReviewScript = Join-Path $ScriptDir "review_frames.ps1"
@@ -672,7 +672,7 @@ function Install-BaseEnvironment {
         if (-not $script:BaseEnvStatus -or -not $script:BaseEnvStatus.Ready) {
             $script:InstallBaseButton.Enabled = $true
         }
-        if (-not $script:GpuStatus -or -not $script:GpuStatus.CudaAvailable) {
+        if ($script:GpuStatus -and $script:GpuStatus.NvidiaAvailable -and -not $script:GpuStatus.CudaAvailable) {
             $script:InstallGpuButton.Enabled = $true
         }
     }
@@ -715,6 +715,15 @@ function Update-EncoderStatus {
             $script:EncoderStatusLabel.Text = "编码检测失败"
             $script:EncoderStatusLabel.ForeColor = [System.Drawing.Color]::Firebrick
             Write-Log ("编码检测失败：" + $script:EncoderStatus.Error)
+        }
+    } elseif ($script:EncoderStatus.H264NvencListed -or $script:EncoderStatus.HevcNvencListed) {
+        $script:EncoderStatusLabel.Text = "NVENC 实测不可用"
+        $script:EncoderStatusLabel.ForeColor = [System.Drawing.Color]::DarkOrange
+        if ($script:EncoderStatus.H264NvencError) {
+            Write-Log ("h264_nvenc 实测失败：" + $script:EncoderStatus.H264NvencError)
+        }
+        if ($script:EncoderStatus.HevcNvencError) {
+            Write-Log ("hevc_nvenc 实测失败：" + $script:EncoderStatus.HevcNvencError)
         }
     } else {
         $script:EncoderStatusLabel.Text = "NVENC 不可用"
@@ -1225,7 +1234,7 @@ $script:InstallGpuButton.Add_Click({
         Show-Error $_.Exception.Message
     } finally {
         $StartButton.Enabled = $true
-        if (-not $script:GpuStatus.CudaAvailable) {
+        if ($script:GpuStatus -and $script:GpuStatus.NvidiaAvailable -and -not $script:GpuStatus.CudaAvailable) {
             $script:InstallGpuButton.Enabled = $true
         }
     }
@@ -1314,7 +1323,7 @@ $StartButton.Add_Click({
             }
             if ($ExitCode -ne 0) {
                 Write-Log "处理失败，退出码：$ExitCode"
-                return
+                throw "处理失败，退出码：$ExitCode。请查看运行日志中的 deface 输出。"
             }
             $CompletedOutputs.Add([string]$OutputDecision.Path) | Out-Null
             $DoneCount++
