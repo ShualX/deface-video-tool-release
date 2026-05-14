@@ -19,7 +19,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 . (Join-Path $ScriptDir "deface_common.ps1")
 
-$AppVersion = "v0.3.0-alpha"
+$AppVersion = "v0.3.1-alpha"
 $OneScript = Join-Path $ScriptDir "deface_one.ps1"
 $BatchScript = Join-Path $ScriptDir "deface_batch.ps1"
 $ReviewScript = Join-Path $ScriptDir "review_frames.ps1"
@@ -332,7 +332,7 @@ function Invoke-GuiCommand {
                         $Stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
                         try {
                             $Stream.Seek($ReadOffsets[$Path], [System.IO.SeekOrigin]::Begin) | Out-Null
-                            $Reader = New-Object System.IO.StreamReader($Stream, [System.Text.Encoding]::Default)
+                            $Reader = New-Object System.IO.StreamReader($Stream, [System.Text.Encoding]::UTF8, $true)
                             $Text = $Reader.ReadToEnd()
                             $ReadOffsets[$Path] = $Stream.Position
                         } finally {
@@ -386,7 +386,7 @@ function Invoke-GuiCommand {
                     $Stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
                     try {
                         $Stream.Seek($AlreadyRead, [System.IO.SeekOrigin]::Begin) | Out-Null
-                        $Reader = New-Object System.IO.StreamReader($Stream, [System.Text.Encoding]::Default)
+                        $Reader = New-Object System.IO.StreamReader($Stream, [System.Text.Encoding]::UTF8, $true)
                         $Text = $Reader.ReadToEnd()
                     } finally {
                         if ($Reader) {
@@ -656,8 +656,14 @@ function Install-BaseEnvironment {
             return $false
         }
 
-        Write-Log "基础环境安装完成，正在重新检测。"
         Update-BaseEnvironmentStatus
+        if (-not $script:BaseEnvStatus.Ready) {
+            Write-Log ("基础环境安装后仍不可用：" + $script:BaseEnvStatus.Message)
+            Show-Error $script:BaseEnvStatus.Message "基础环境安装失败"
+            return $false
+        }
+
+        Write-Log "基础环境安装完成，正在重新检测。"
         Update-GpuStatus
         Update-EncoderStatus
         Set-Progress 1 1 "基础环境已安装"
