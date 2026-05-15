@@ -34,7 +34,10 @@
     [string]$Encoder = "libx264",
     [ValidateSet("overwrite", "skip", "rename")]
     [string]$ExistingAction = "skip",
-    [string]$FfmpegConfig
+    [string]$FfmpegConfig,
+
+    [ValidateSet(1, 2, 4)]
+    [int]$ParallelSegments = 1
 )
 
 Set-StrictMode -Version Latest
@@ -43,6 +46,7 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 $OneScript = Join-Path $ScriptDir "deface_one.ps1"
+$ParallelScript = Join-Path $ScriptDir "deface_parallel.ps1"
 . (Join-Path $ScriptDir "deface_common.ps1")
 
 if (-not $InputDir) {
@@ -84,10 +88,12 @@ foreach ($Video in $Videos) {
     Write-Host ""
     Write-Host "Processing $($Video.Name)"
 
+    $WorkerScript = if ($ParallelSegments -gt 1) { $ParallelScript } else { $OneScript }
+
     $CommandArgs = @(
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
-        "-File", $OneScript,
+        "-File", $WorkerScript,
         "-InputPath", $Video.FullName,
         "-OutputPath", $OutputPath,
         "-Thresh", (Format-DefaceDouble $Thresh),
@@ -106,6 +112,9 @@ foreach ($Video in $Videos) {
         "-ExistingAction", "overwrite"
     )
 
+    if ($ParallelSegments -gt 1) {
+        $CommandArgs += @("-Segments", ([string]$ParallelSegments))
+    }
     if ($ReplaceImg) {
         $CommandArgs += @("-ReplaceImg", $ReplaceImg)
     }

@@ -19,8 +19,9 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 . (Join-Path $ScriptDir "deface_common.ps1")
 
-$AppVersion = "v0.3.2-alpha"
+$AppVersion = "v0.4.2-alpha"
 $OneScript = Join-Path $ScriptDir "deface_one.ps1"
+$ParallelScript = Join-Path $ScriptDir "deface_parallel.ps1"
 $BatchScript = Join-Path $ScriptDir "deface_batch.ps1"
 $ReviewScript = Join-Path $ScriptDir "review_frames.ps1"
 $PythonExe = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
@@ -765,6 +766,17 @@ function Get-CommonDefaceArgs {
     return $Args
 }
 
+function Get-SelectedParallelSegments {
+    $Value = [string]$script:ParallelSegmentsCombo.SelectedItem
+    if (-not $Value) {
+        $Value = $script:ParallelSegmentsCombo.Text
+    }
+    if ($Value -notmatch "^(1|2|4)$") {
+        return 1
+    }
+    return [int]$Value
+}
+
 function Validate-Inputs {
     if ($script:ScaleCombo.Text.Trim() -notmatch "^\d+x\d+$") {
         Show-Warning "推理分辨率必须类似 1280x720。"
@@ -787,6 +799,10 @@ function Validate-Inputs {
     }
     if (([string]$script:ReplaceCombo.SelectedItem) -eq "img" -and -not (Test-Path -LiteralPath $script:ReplaceImgBox.Text)) {
         Show-Warning "替换模式为 img 时，必须选择替换图片。"
+        return $false
+    }
+    if ($script:PreviewCheck.Checked -and (Get-SelectedParallelSegments) -gt 1) {
+        Show-Warning "实时预览不能和并行分段同时使用。请关闭实时预览，或把并行分段设为 1。"
         return $false
     }
     return $true
@@ -891,6 +907,7 @@ function Get-GuiSettings {
         AutoReview = [bool]$script:AutoReviewCheck.Checked
         ReviewSeconds = [int]$script:ReviewSecondsBox.Value
         UseGpu = [bool]$script:UseGpuCheck.Checked
+        ParallelSegments = Get-SelectedParallelSegments
     }
 }
 
@@ -952,6 +969,7 @@ function Load-GuiSettings {
         Set-ComboValue $script:ExistingActionCombo ([string]$Settings.ExistingAction)
         if ($null -ne $Settings.AutoReview) { $script:AutoReviewCheck.Checked = [bool]$Settings.AutoReview }
         if ($null -ne $Settings.ReviewSeconds) { $script:ReviewSecondsBox.Value = [decimal]$Settings.ReviewSeconds }
+        if ($null -ne $Settings.ParallelSegments) { Set-ComboValue $script:ParallelSegmentsCombo ([string]$Settings.ParallelSegments) }
         if ($null -ne $Settings.UseGpu) {
             $script:GpuWasTouched = $true
             $script:UseGpuCheck.Checked = [bool]$Settings.UseGpu
@@ -965,8 +983,8 @@ function Load-GuiSettings {
 $Form = New-Object System.Windows.Forms.Form
 $Form.Text = "本地视频人脸打码工具 $AppVersion"
 $Form.StartPosition = "CenterScreen"
-$Form.Size = New-Object System.Drawing.Size(1000, 920)
-$Form.MinimumSize = New-Object System.Drawing.Size(1000, 920)
+$Form.Size = New-Object System.Drawing.Size(1000, 960)
+$Form.MinimumSize = New-Object System.Drawing.Size(1000, 960)
 $Form.Font = New-UiFont 9
 
 $Title = New-Object System.Windows.Forms.Label
@@ -1035,7 +1053,7 @@ $BrowseOutputDirButton = Add-Button $PathGroup "浏览..." 808 126 88 28
 $ParamGroup = New-Object System.Windows.Forms.GroupBox
 $ParamGroup.Text = "打码参数"
 $ParamGroup.Location = New-Object System.Drawing.Point(16, 332)
-$ParamGroup.Size = New-Object System.Drawing.Size(950, 286)
+$ParamGroup.Size = New-Object System.Drawing.Size(950, 322)
 $Form.Controls.Add($ParamGroup)
 
 Add-Label $ParamGroup "预设：" 18 28 70 24 | Out-Null
@@ -1063,40 +1081,49 @@ $script:DrawScoresCheck = Add-CheckBox $ParamGroup "显示检测分数" 822 66 1
 
 $script:PreviewCheck = Add-CheckBox $ParamGroup "实时预览" 18 104 96 $false
 
-Add-Label $ParamGroup "替换图片：" 132 104 82 24 | Out-Null
-$script:ReplaceImgBox = Add-TextBox $ParamGroup "" 218 104 576 24
-$script:BrowseReplaceImgButton = Add-Button $ParamGroup "浏览..." 808 102 88 28
+Add-Label $ParamGroup "并行分段：" 132 104 82 24 | Out-Null
+$script:ParallelSegmentsCombo = Add-Combo $ParamGroup @("1", "2", "4") "1" 218 104 72 $false
+$ParallelHint = New-Object System.Windows.Forms.Label
+$ParallelHint.Text = "2/4 段会先切片并行处理再合并；GPU 建议先试 2 段。"
+$ParallelHint.Location = New-Object System.Drawing.Point(306, 104)
+$ParallelHint.Size = New-Object System.Drawing.Size(588, 24)
+$ParallelHint.ForeColor = [System.Drawing.Color]::DimGray
+$ParamGroup.Controls.Add($ParallelHint)
 
-Add-Label $ParamGroup "后端：" 18 142 70 24 | Out-Null
-$script:BackendCombo = Add-Combo $ParamGroup @("auto", "onnxrt", "opencv") "auto" 86 142 120 $false
+Add-Label $ParamGroup "替换图片：" 18 142 82 24 | Out-Null
+$script:ReplaceImgBox = Add-TextBox $ParamGroup "" 104 142 690 24
+$script:BrowseReplaceImgButton = Add-Button $ParamGroup "浏览..." 808 140 88 28
 
-Add-Label $ParamGroup "Provider：" 230 142 82 24 | Out-Null
-$script:ExecutionProviderBox = Add-TextBox $ParamGroup "" 316 142 220 24
+Add-Label $ParamGroup "后端：" 18 180 70 24 | Out-Null
+$script:BackendCombo = Add-Combo $ParamGroup @("auto", "onnxrt", "opencv") "auto" 86 180 120 $false
 
-Add-Label $ParamGroup "视频编码：" 558 142 82 24 | Out-Null
-$script:EncoderCombo = Add-Combo $ParamGroup @("libx264", "h264_nvenc", "hevc_nvenc", "custom") "libx264" 642 142 118 $false
-$script:EncoderStatusLabel = Add-Label $ParamGroup "检测中..." 774 142 120 24
+Add-Label $ParamGroup "Provider：" 230 180 82 24 | Out-Null
+$script:ExecutionProviderBox = Add-TextBox $ParamGroup "" 316 180 220 24
 
-Add-Label $ParamGroup "FFmpeg JSON：" 18 178 100 24 | Out-Null
-$script:FfmpegConfigBox = Add-TextBox $ParamGroup "" 122 178 772 24
+Add-Label $ParamGroup "视频编码：" 558 180 82 24 | Out-Null
+$script:EncoderCombo = Add-Combo $ParamGroup @("libx264", "h264_nvenc", "hevc_nvenc", "custom") "libx264" 642 180 118 $false
+$script:EncoderStatusLabel = Add-Label $ParamGroup "检测中..." 774 180 120 24
+
+Add-Label $ParamGroup "FFmpeg JSON：" 18 216 100 24 | Out-Null
+$script:FfmpegConfigBox = Add-TextBox $ParamGroup "" 122 216 772 24
 
 $ThinHint = New-Object System.Windows.Forms.Label
 $ThinHint.Text = "薄码建议：马赛克块 6-10，遮罩 1.10-1.25；想更稳就增大遮罩或改回标准。"
-$ThinHint.Location = New-Object System.Drawing.Point(18, 214)
+$ThinHint.Location = New-Object System.Drawing.Point(18, 252)
 $ThinHint.Size = New-Object System.Drawing.Size(860, 24)
 $ThinHint.ForeColor = [System.Drawing.Color]::DimGray
 $ParamGroup.Controls.Add($ThinHint)
 
 $script:PresetDescriptionLabel = New-Object System.Windows.Forms.Label
 $script:PresetDescriptionLabel.Text = ""
-$script:PresetDescriptionLabel.Location = New-Object System.Drawing.Point(18, 242)
+$script:PresetDescriptionLabel.Location = New-Object System.Drawing.Point(18, 280)
 $script:PresetDescriptionLabel.Size = New-Object System.Drawing.Size(860, 24)
 $script:PresetDescriptionLabel.ForeColor = [System.Drawing.Color]::DimGray
 $ParamGroup.Controls.Add($script:PresetDescriptionLabel)
 
 $ReviewGroup = New-Object System.Windows.Forms.GroupBox
 $ReviewGroup.Text = "复查与执行"
-$ReviewGroup.Location = New-Object System.Drawing.Point(16, 628)
+$ReviewGroup.Location = New-Object System.Drawing.Point(16, 664)
 $ReviewGroup.Size = New-Object System.Drawing.Size(950, 126)
 $Form.Controls.Add($ReviewGroup)
 
@@ -1131,7 +1158,7 @@ $ReviewGroup.Controls.Add($script:ProgressLabel)
 
 $LogGroup = New-Object System.Windows.Forms.GroupBox
 $LogGroup.Text = "运行日志"
-$LogGroup.Location = New-Object System.Drawing.Point(16, 764)
+$LogGroup.Location = New-Object System.Drawing.Point(16, 800)
 $LogGroup.Size = New-Object System.Drawing.Size(950, 110)
 $Form.Controls.Add($LogGroup)
 
@@ -1288,6 +1315,10 @@ $StartButton.Add_Click({
         }
 
         $CommonArgs = Get-CommonDefaceArgs
+        $ParallelSegments = Get-SelectedParallelSegments
+        if ($script:UseGpuCheck.Checked -and $ParallelSegments -gt 2) {
+            Write-Log "提示：GPU 并行 4 段可能会抢显存或编码器；如果失败，请改用 2 段。"
+        }
         $CompletedOutputs = New-Object System.Collections.Generic.List[string]
         $DoneCount = 0
         Set-Progress 0 $Videos.Count "准备处理"
@@ -1312,16 +1343,24 @@ $StartButton.Add_Click({
                 continue
             }
 
+            $WorkerScript = if ($ParallelSegments -gt 1) { $ParallelScript } else { $OneScript }
             $Args = @(
                 "-NoProfile",
                 "-ExecutionPolicy", "Bypass",
-                "-File", $OneScript,
+                "-File", $WorkerScript,
                 "-InputPath", $Video.FullName,
                 "-OutputPath", $OutputDecision.Path,
                 "-ExistingAction", "overwrite"
             ) + $CommonArgs
+            if ($ParallelSegments -gt 1) {
+                $Args += @("-Segments", ([string]$ParallelSegments))
+            }
             Write-Log "开始处理：$($Video.Name)"
-            Set-Progress $DoneCount $Videos.Count ("处理中：$($Video.Name)")
+            if ($ParallelSegments -gt 1) {
+                Set-Progress $DoneCount $Videos.Count ("处理中：$($Video.Name)（并行 $ParallelSegments 段）")
+            } else {
+                Set-Progress $DoneCount $Videos.Count ("处理中：$($Video.Name)")
+            }
             $ExitCode = Invoke-GuiCommand "powershell.exe" $Args
             if ($ExitCode -eq 130 -or $script:CancelRequested) {
                 Write-Log "处理已停止。"

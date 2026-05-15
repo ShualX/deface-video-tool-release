@@ -1,6 +1,6 @@
 # 本地视频人脸打码工具
 
-当前版本：`v0.3.2-alpha`
+当前版本：`v0.4.2-alpha`
 
 一个面向 Windows 的本地视频人脸打码工具，基于 Python `deface` 实现人脸检测与匿名化处理，并提供中文 PowerShell GUI 界面。适合批量处理视频、保留原音频、生成抽帧复查报告，帮助快速检查是否存在漏打码画面。
 
@@ -13,6 +13,7 @@
 - 所有核心参数可调：检测阈值、遮罩放大、推理分辨率、马赛克块大小、替换模式等。
 - 自动检测 NVIDIA GPU，可用时支持 CUDA 推理加速。
 - 支持 NVIDIA NVENC 硬件编码：`h264_nvenc` / `hevc_nvenc`。
+- 支持单个视频按 2 段或 4 段切片并行处理，处理完成后自动合并。
 - 支持输出文件处理策略：跳过已处理、直接覆盖、自动改名、手动询问。
 - 支持处理完成后每隔指定秒数抽帧复查。
 - 自动生成 `review.html` 复查报告，方便快速浏览抽帧结果。
@@ -34,7 +35,7 @@
 启动人脸打码工具.bat
 ```
 
-首次使用请先安装基础环境。可以双击打开 GUI 后点击“安装基础环境”，GPU 组件可装可不装，GPU加速能显著提升处理速度。
+首次使用请先安装基础环境。可以双击打开 GUI 后点击“安装基础环境”，GPU 组件可装可不装，GPU 加速能显著提升处理速度。
 
 3. 把视频放入：
 
@@ -99,6 +100,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deface_one.ps1
   -Encoder h264_nvenc
 ```
 
+并行分段处理示例：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deface_parallel.ps1 `
+  .\input_videos\example.mp4 `
+  -Segments 2
+```
+
 ## 主要参数
 
 | 参数 | 默认值 | 说明 |
@@ -111,6 +120,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deface_one.ps1
 | `KeepAudio` | `True` | 保留原视频音频 |
 | `UseGpu` | `False` | 启用 CUDA 推理加速 |
 | `Encoder` | `libx264` | 视频编码器，可选 `libx264`、`h264_nvenc`、`hevc_nvenc` |
+| `Segments` | `2` | 仅 `deface_parallel.ps1` 使用，可选 `1`、`2`、`4`，表示把单个视频切成几段并行处理 |
+| `ParallelSegments` | `1` | 仅 `deface_batch.ps1` 使用，可选 `1`、`2`、`4`，批量处理时每个视频的并行分段数 |
 | `ExistingAction` | `skip` | 输出文件已存在时的行为：覆盖、跳过、自动改名 |
 
 ## 打码预设建议
@@ -133,6 +144,16 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deface_one.ps1
 
 NVENC 主要加速视频输出编码，不等同于人脸检测加速。
 
+## 并行分段
+
+GUI 中的“并行分段”可以选择 `1`、`2`、`4`：
+
+- `1`：普通单进程处理，最稳。
+- `2`：推荐优先尝试，通常能更好利用多核 CPU，也比较不容易抢 GPU 显存。
+- `4`：适合 CPU 核心数较多、内存充足的长视频；如果使用 GPU，可能因为多个进程抢同一块显卡而变慢或失败。
+
+并行模式会先用 ffmpeg 把视频切成多段，再分别调用 `deface_one.ps1`，最后把处理完成的分段无损合并。为了避免非关键帧切片导致重复或错位，切片阶段会临时重编码视频流，并把临时片段音频编码为 AAC；实时预览不能和并行分段同时使用。
+
 ## 复查报告
 
 处理完成后可以自动抽帧，例如每 5 秒抽一帧。工具会生成：
@@ -154,6 +175,7 @@ review_frames/review.html
 ├─ scripts/
 │  ├─ deface_gui.ps1      # 中文 GUI 主程序
 │  ├─ deface_one.ps1      # 处理单个视频
+│  ├─ deface_parallel.ps1 # 单个视频分段并行处理
 │  ├─ deface_batch.ps1    # 批量处理视频
 │  ├─ review_frames.ps1   # 抽帧复查
 │  └─ deface_common.ps1   # 公共函数
