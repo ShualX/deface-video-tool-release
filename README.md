@@ -1,6 +1,6 @@
 # 本地视频人脸打码工具
 
-当前版本：`v0.3.1-alpha`
+当前版本：`v0.3.2-alpha`
 
 一个面向 Windows 的本地视频人脸打码工具，基于 Python `deface` 实现人脸检测与匿名化处理，并提供中文 PowerShell GUI 界面。适合批量处理视频、保留原音频、生成抽帧复查报告，帮助快速检查是否存在漏打码画面。
 
@@ -21,13 +21,22 @@
 
 ## 快速开始
 
-1. 前往release下载最新版本压缩包，将压缩包解压后，双击启动
+1. 前往 Release 下载最新版本压缩包。
+
+推荐按电脑环境选择：
+
+- `script` 版：体积最小，要求电脑已经安装 Python 3.10+。
+- `portable-python` 版：内置便携 Python，适合没有 Python 的电脑；首次点击“安装基础环境”时仍需要联网安装 deface 依赖。
+
+2. 将压缩包解压后，双击启动：
+
  ```text
 启动人脸打码工具.bat
 ```
-首次使用请先安装基础环境。可以双击打开 GUI 后点击“安装基础环境”，GPU组件可装可不装，实测对处理速度影响不大。
 
-2. 把视频放入：
+首次使用请先安装基础环境。可以双击打开 GUI 后点击“安装基础环境”，GPU 组件可装可不装，实测对处理速度影响不大。
+
+3. 把视频放入：
 
 ```text
 input_videos
@@ -35,17 +44,17 @@ input_videos
 
 
 
-3. 在 GUI 中选择处理模式、打码预设和输出策略。
+4. 在 GUI 中选择处理模式、打码预设和输出策略。
 
-4. 点击“开始处理”。
+5. 点击“开始处理”。
 
-5. 处理完成后，结果会输出到：
+6. 处理完成后，结果会输出到：
 
 ```text
 output_videos
 ```
 
-6. 如果启用了抽帧复查，复查图片和 HTML 报告会生成在：
+7. 如果启用了抽帧复查，复查图片和 HTML 报告会生成在：
 
 ```text
 review_frames
@@ -141,6 +150,7 @@ review_frames/review.html
 ├─ input_videos/          # 放入待处理视频
 ├─ output_videos/         # 输出打码后的视频
 ├─ review_frames/         # 抽帧复查图片和 review.html
+├─ portable_python/       # 仅 portable-python 版包含
 ├─ scripts/
 │  ├─ deface_gui.ps1      # 中文 GUI 主程序
 │  ├─ deface_one.ps1      # 处理单个视频

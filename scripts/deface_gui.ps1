@@ -19,7 +19,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 . (Join-Path $ScriptDir "deface_common.ps1")
 
-$AppVersion = "v0.3.1-alpha"
+$AppVersion = "v0.3.2-alpha"
 $OneScript = Join-Path $ScriptDir "deface_one.ps1"
 $BatchScript = Join-Path $ScriptDir "deface_batch.ps1"
 $ReviewScript = Join-Path $ScriptDir "review_frames.ps1"

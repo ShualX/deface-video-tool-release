@@ -52,6 +52,14 @@ function Test-PythonCandidate {
 }
 
 function Get-SetupPython {
+    $PortablePython = Join-Path $ProjectRoot "portable_python\python.exe"
+    if (Test-Path -LiteralPath $PortablePython) {
+        $Python = Test-PythonCandidate -FilePath $PortablePython -DisplayName ".\portable_python\python.exe"
+        if ($Python) {
+            return $Python
+        }
+    }
+
     $Candidates = @(
         @{ Name = "py"; Args = @("-3"); Label = "py" },
         @{ Name = "python"; Args = @(); Label = "python" },
@@ -70,7 +78,7 @@ function Get-SetupPython {
         }
     }
 
-    throw "没有找到可用的 Python 3。请先安装 Python 3.10+，并勾选 Add Python to PATH，然后重新运行安装。"
+    throw "没有找到可用的 Python 3。请下载 portable-python 版，或先安装 Python 3.10+ 并勾选 Add Python to PATH，然后重新运行安装。"
 }
 
 try {

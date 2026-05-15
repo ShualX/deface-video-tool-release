@@ -1,4 +1,5 @@
 .venv/
+portable_python/
 input_videos/*
 output_videos/*
 review_frames/*
@@ -15,6 +16,8 @@ __pycache__/
 pip-wheel-metadata/
 dist/
 build/
+release/
+release_dist/
 *.egg-info/
 
 # Large or private media files
